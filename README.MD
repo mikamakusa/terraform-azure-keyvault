@@ -11,12 +11,6 @@
 | <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 2.53.1 |
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 3.116.0 |
 
-## Modules
-
-| Name | Source | Version |
-|------|--------|---------|
-| <a name="module_storage"></a> [storage](#module\_storage) | ../terraform-azure-storage | n/a |
-
 ## Resources
 
 | Name | Type |
