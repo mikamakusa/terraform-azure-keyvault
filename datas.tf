@@ -14,5 +14,11 @@ data "azurerm_key_vault_managed_hardware_security_module" "this" {
 
 data "azurerm_key_vault_managed_hardware_security_module_role_definition" "this" {
   count = length(var.managed_hardware_security_module_role_definition)
-  name = lookup(var.managed_hardware_security_module_role_definition[count.index], "name")
+  name  = lookup(var.managed_hardware_security_module_role_definition[count.index], "name")
+}
+
+data "azurerm_storage_account" "this" {
+  count               = length(var.storage_account)
+  name                = lookup(var.storage_account[count.index], "name")
+  resource_group_name = data.azurerm_resource_group.this.name
 }
