@@ -14,7 +14,8 @@ variable "resource_group_name" {
 ## MODULES ##
 
 variable "storage_account" {
-  type = any
+  type    = any
+  default = []
 }
 
 ## RESOURCES ##

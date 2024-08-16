@@ -13,7 +13,9 @@
 
 ## Modules
 
-No modules.
+| Name | Source | Version |
+|------|--------|---------|
+| <a name="module_storage"></a> [storage](#module\_storage) | modules/storage | n/a |
 
 ## Resources
 
@@ -57,7 +59,7 @@ No modules.
 | <a name="input_managed_storage_account_sas_token_definition"></a> [managed\_storage\_account\_sas\_token\_definition](#input\_managed\_storage\_account\_sas\_token\_definition) | n/a | <pre>list(object({<br>    id                         = number<br>    managed_storage_account_id = any<br>    name                       = string<br>    sas_template_id            = any<br>    sas_type                   = string<br>    validity_period            = string<br>    tags                       = optional(map(string))<br>  }))</pre> | `[]` | no |
 | <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name) | n/a | `string` | n/a | yes |
 | <a name="input_secret"></a> [secret](#input\_secret) | n/a | <pre>list(object({<br>    id              = number<br>    key_vault_id    = any<br>    name            = string<br>    value           = string<br>    content_type    = optional(string)<br>    not_before_date = optional(string)<br>    expiration_date = optional(string)<br>    tags            = optional(map(string))<br>  }))</pre> | `[]` | no |
-| <a name="input_storage_account"></a> [storage\_account](#input\_storage\_account) | n/a | `any` | n/a | yes |
+| <a name="input_storage_account"></a> [storage\_account](#input\_storage\_account) | n/a | `any` | `[]` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | n/a | `map(string)` | `{}` | no |
 
 ## Outputs
