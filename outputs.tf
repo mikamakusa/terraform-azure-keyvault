@@ -46,6 +46,24 @@ output "certificate_contacts_id" {
   )
 }
 
+output "certificate_attribute_expires" {
+  value = try(
+    azurerm_key_vault_certificate.this.certificate_attribute[0].expires
+  )
+}
+
+output "certificate_attribute_not_before" {
+  value = try(
+    azurerm_key_vault_certificate.this.certificate_attribute[0].not_before
+  )
+}
+
+output "certificate_attribute_data" {
+  value = try(
+    azurerm_key_vault_certificate.this.*.certificate_data
+  )
+}
+
 ## KEY VAULT KEY
 
 output "key_vault_key_id" {

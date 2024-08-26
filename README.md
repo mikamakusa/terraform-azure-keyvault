@@ -15,7 +15,7 @@
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_storage"></a> [storage](#module\_storage) | modules/storage | n/a |
+| <a name="module_storage"></a> [storage](#module\_storage) | ./modules/terraform-azure-storage | n/a |
 
 ## Resources
 
@@ -66,6 +66,9 @@
 
 | Name | Description |
 |------|-------------|
+| <a name="output_certificate_attribute_data"></a> [certificate\_attribute\_data](#output\_certificate\_attribute\_data) | n/a |
+| <a name="output_certificate_attribute_expires"></a> [certificate\_attribute\_expires](#output\_certificate\_attribute\_expires) | n/a |
+| <a name="output_certificate_attribute_not_before"></a> [certificate\_attribute\_not\_before](#output\_certificate\_attribute\_not\_before) | n/a |
 | <a name="output_certificate_contacts_id"></a> [certificate\_contacts\_id](#output\_certificate\_contacts\_id) | n/a |
 | <a name="output_certificate_id"></a> [certificate\_id](#output\_certificate\_id) | n/a |
 | <a name="output_certificate_issuer_id"></a> [certificate\_issuer\_id](#output\_certificate\_issuer\_id) | n/a |
