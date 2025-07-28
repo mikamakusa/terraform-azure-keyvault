@@ -14,6 +14,12 @@
 
 No modules.
 
+## Usage
+
+- [keyvault](examples/keyvault/main.tf)
+- [key](examples/key/main.tf)
+- [hsm](examples/hsm/main.tf)
+
 ## Resources
 
 | Name | Type |
