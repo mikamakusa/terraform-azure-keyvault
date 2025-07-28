@@ -1,140 +1,112 @@
 resource "azurerm_key_vault" "this" {
-  count                           = length(var.key_vault)
+  for_each                        = { for a in var.key_vault : a.name => a }
   location                        = data.azurerm_resource_group.this.location
-  name                            = lookup(var.key_vault[count.index], "name")
+  name                            = each.value.name
   resource_group_name             = data.azurerm_resource_group.this.name
-  sku_name                        = lookup(var.key_vault[count.index], "sku_name")
+  sku_name                        = each.value.sku_name
   tenant_id                       = data.azurerm_client_config.this.tenant_id
-  enable_rbac_authorization       = lookup(var.key_vault[count.index], "enable_rbac_authorization")
-  enabled_for_deployment          = lookup(var.key_vault[count.index], "enabled_for_deployment")
-  enabled_for_disk_encryption     = lookup(var.key_vault[count.index], "enabled_for_disk_encryption")
-  enabled_for_template_deployment = lookup(var.key_vault[count.index], "enabled_for_template_deployment")
-  public_network_access_enabled   = lookup(var.key_vault[count.index], "public_network_access_enabled")
-  purge_protection_enabled        = lookup(var.key_vault[count.index], "purge_protection_enabled")
-  soft_delete_retention_days      = lookup(var.key_vault[count.index], "soft_delete_retention_days")
-  tags                            = merge(var.tags, lookup(var.key_vault[count.index], "tags"))
-
-  dynamic "access_policy" {
-    for_each = lookup(var.key_vault[count.index], "access_policy") == null ? [] : ["access_policy"]
-    content {
-      tenant_id               = data.azurerm_client_config.this.tenant_id
-      object_id               = data.azurerm_client_config.this.object_id
-      application_id          = lookup(access_policy.value, "application_id")
-      certificate_permissions = lookup(access_policy.value, "certificate_permissions")
-      key_permissions         = lookup(access_policy.value, "key_permissions")
-      secret_permissions      = lookup(access_policy.value, "secret_permissions")
-      storage_permissions     = lookup(access_policy.value, "storage_permissions")
-    }
-  }
-
-  dynamic "contact" {
-    for_each = lookup(var.key_vault[count.index], "contact") == null ? [] : ["contact"]
-    content {
-      email = lookup(contact.value, "email")
-      name  = lookup(contact.value, "name")
-      phone = lookup(contact.value, "phone")
-    }
-  }
+  enable_rbac_authorization       = each.value.enable_rbac_authorization
+  enabled_for_deployment          = each.value.enabled_for_deployment
+  enabled_for_disk_encryption     = each.value.enabled_for_disk_encryption
+  enabled_for_template_deployment = each.value.enabled_for_template_deployment
+  public_network_access_enabled   = each.value.public_network_access_enabled
+  purge_protection_enabled        = each.value.purge_protection_enabled
+  soft_delete_retention_days      = each.value.soft_delete_retention_days
+  tags                            = merge(var.tags, each.value.tags)
 
   dynamic "network_acls" {
-    for_each = lookup(var.key_vault[count.index], "network_acls") == null ? [] : ["network_acls"]
+    for_each = { for a in var.key_vault : a.name => a if contains(keys(a), "network_acls") && a.network_acls != null }
     content {
-      bypass                     = lookup(network_acls.value, "bypass")
-      default_action             = lookup(network_acls.value, "default_action")
-      ip_rules                   = lookup(network_acls.value, "ip_rules")
-      virtual_network_subnet_ids = lookup(network_acls.value, "virtual_network_subnet_ids")
+      bypass                     = lookup(each.value, "bypass")
+      default_action             = lookup(each.value, "default_action")
+      ip_rules                   = lookup(each.value, "ip_rules")
+      virtual_network_subnet_ids = lookup(each.value, "virtual_network_subnet_ids")
     }
   }
 }
 
 resource "azurerm_key_vault_access_policy" "this" {
-  count                   = length(var.key_vault) == 0 ? 0 : length(var.access_policy)
-  key_vault_id            = try(element(azurerm_key_vault.this.*.id, lookup(var.access_policy[count.index], "key_vault_id")))
-  object_id               = data.azuread_service_principal.this.object_id
+  for_each                = { for a in var.key_vault : a.name => a if contains(keys(a), "access_policy") && a.access_policy != null }
+  key_vault_id            = azurerm_key_vault.this[each.key].id
+  object_id               = lookup(each.value, "object_id")
   tenant_id               = data.azurerm_client_config.this.tenant_id
-  application_id          = lookup(var.access_policy[count.index], "application_id")
-  certificate_permissions = lookup(var.access_policy[count.index], "certificate_permissions")
-  key_permissions         = lookup(var.access_policy[count.index], "key_permissions")
-  secret_permissions      = lookup(var.access_policy[count.index], "secret_permissions")
-  storage_permissions     = lookup(var.access_policy[count.index], "storage_permissions")
+  application_id          = lookup(each.value, "application_id")
+  certificate_permissions = lookup(each.value, "certificate_permissions")
+  key_permissions         = lookup(each.value, "key_permissions")
+  secret_permissions      = lookup(each.value, "secret_permissions")
+  storage_permissions     = lookup(each.value, "storage_permissions")
 }
 
 resource "azurerm_key_vault_certificate" "this" {
-  count        = length(var.key_vault) == 0 ? 0 : length(var.certificate)
-  key_vault_id = try(element(azurerm_key_vault.this.*.id, lookup(var.certificate[count.index], "key_vault_id")))
-  name         = lookup(var.certificate[count.index], "name")
-  tags         = merge(var.tags, lookup(var.certificate[count.index], "tags"))
+  for_each     = { for a in var.key_vault : a.name => a if contains(keys(a), "certificate") && a.certificate != null }
+  key_vault_id = azurerm_key_vault.this[each.key].id
+  name         = lookup(each.value, "name")
+  tags         = merge(var.tags, lookup(each.value, "tags"))
 
   dynamic "certificate" {
-    for_each = lookup(var.certificate[count.index], "certificate") == null ? [] : ["certificate"]
+    for_each = { for a in var.key_vault.*.certificate : a.name => a if contains(keys(a), "certificate") && a.certificate != null }
     content {
-      contents = file(join("/", [path.cwd, "certificate", lookup(certificate.value, "contents")]))
-      password = sensitive(lookup(certificate.value, "password"))
+      contents = file(join("/", [path.cwd, "certificate", lookup(each.value, "contents")]))
+      password = sensitive(lookup(each.value, "password"))
     }
   }
 
   dynamic "certificate_policy" {
-    for_each = lookup(var.certificate[count.index], "certificate_policy") == null ? [] : ["certificate_policy"]
+    for_each = { for a in var.key_vault.*.certificate : a.name => a if contains(keys(a), "certificate_policy") && a.certificate_policy != null }
     content {
-      dynamic "issuer_parameters" {
-        for_each = lookup(certificate_policy.value, "issuer_parameters_name") != null ? ["issuer_parameters"] : []
-        content {
-          name = lookup(certificate_policy.value, "issuer_parameters_name")
-        }
+      issuer_parameters {
+        name = lookup(each.value, "issuer_parameters_name")
       }
 
-      dynamic "key_properties" {
-        for_each = lookup(certificate_policy.value, "key_properties")
+      key_properties {
+        key_type   = lookup(each.value, "key_type")
+        reuse_key  = lookup(each.value, "reuse_key")
+        exportable = lookup(each.value, "exportable")
+        key_size   = lookup(each.value, "key_size")
+        curve      = lookup(each.value, "curve")
+      }
+
+      dynamic "secret_properties" {
+        for_each = { for a in var.key_vault.*.certificate : a.name => a if contains(keys(a), "content_type") }
         content {
-          key_type   = lookup(key_properties.value, "key_type")
-          reuse_key  = lookup(key_properties.value, "reuse_key")
-          exportable = lookup(key_properties.value, "exportable")
-          key_size   = lookup(key_properties.value, "key_size")
-          curve      = lookup(key_properties.value, "curve")
+          content_type = lookup(each.value, "content_type")
         }
       }
 
       dynamic "lifetime_action" {
-        for_each = lookup(certificate_policy.value, "lifetime_action")
+        for_each = { for a in var.key_vault.*.certificate : a.name => a if contains(keys(a), "lifetime_action") && a.*.certificate_policy.lifetime_action != null }
         content {
-          dynamic "action" {
-            for_each = lookup(lifetime_action.value, "action_type") != null ? ["action"] : []
-            content {
-              action_type = lookup(lifetime_action.value, "action_type")
-            }
+          action {
+            action_type = lookup(lifetime_action.value, "action_type")
           }
-
-          dynamic "trigger" {
-            for_each = (lookup(lifetime_action.value, "trigger_days_before_expiry") || lookup(lifetime_action.value, "trigger_lifetime_percentage")) != null ? ["trigger"] : []
-            content {
-              days_before_expiry  = lookup(lifetime_action.value, "trigger_days_before_expiry")
-              lifetime_percentage = lookup(lifetime_action.value, "trigger_lifetime_percentage")
-            }
+          trigger {
+            days_before_expiry  = lookup(lifetime_action.value, "days_before_expiry")
+            lifetime_percentage = lookup(lifetime_action.value, "lifetime_percentage")
           }
         }
       }
 
       dynamic "secret_properties" {
-        for_each = lookup(certificate_policy.value, "secret_properties_content_type") != null ? ["secret_properties"] : []
+        for_each = { for a in var.key_vault.*.certificate : a.name => a if contains(keys(a), "secret_properties") && a[0].certificate_policy.secret_properties != null }
         content {
-          content_type = lookup(certificate_policy.value, "secret_properties_content_type")
+          content_type = lookup(each.value, "secret_properties_content_type")
         }
       }
 
       dynamic "x509_certificate_properties" {
-        for_each = lookup(certificate_policy.value, "x509_certificate_properties")
+        for_each = { for a in var.key_vault.*.certificate : a.name => a if contains(keys(a), "x509_certificate_properties") && a[0].certificate_policy.x509_certificate_properties != null }
         content {
-          key_usage          = lookup(x509_certificate_properties.value, "key_usage")
-          validity_in_months = lookup(x509_certificate_properties.value, "validity_in_months")
-          subject            = lookup(x509_certificate_properties.value, "subject")
-          extended_key_usage = lookup(x509_certificate_properties.value, "extended_key_usage")
+          key_usage          = lookup(each.value, "key_usage")
+          validity_in_months = lookup(each.value, "validity_in_months")
+          subject            = lookup(each.value, "subject")
+          extended_key_usage = lookup(each.value, "extended_key_usage")
 
           dynamic "subject_alternative_names" {
-            for_each = lookup(x509_certificate_properties.value, "subject_alternative_names") == null ? [] : ["subject_alternative_names"]
+            for_each = { for a in var.key_vault.*.certificate : a.name => a if contains(keys(a), "subject_alternative_names") && a[0].certificate_policy.*.x509_certificate_properties.subject_alternative_names != null }
             content {
-              dns_names = lookup(subject_alternative_names.value, "dns_names")
-              emails    = lookup(subject_alternative_names.value, "emails")
-              upns      = lookup(subject_alternative_names.value, "upns")
+              dns_names = lookup(each.value, "dns_names")
+              emails    = lookup(each.value, "emails")
+              upns      = lookup(each.value, "upns")
             }
           }
         }
@@ -144,62 +116,56 @@ resource "azurerm_key_vault_certificate" "this" {
 }
 
 resource "azurerm_key_vault_certificate_contacts" "this" {
-  count        = length(var.key_vault) == 0 ? 0 : length(var.certificate_contacts)
-  key_vault_id = try(element(azurerm_key_vault.this.*.id, lookup(var.certificate_contacts[count.index], "key_vault_id")))
+  for_each     = { for a in var.key_vault : a.name => a if contains(keys(a), "contacts") && a.contacts != null }
+  key_vault_id = azurerm_key_vault.this[each.key].id
 
-  dynamic "contact" {
-    for_each = lookup(var.certificate_contacts[count.index], "contact")
-    content {
-      email = lookup(contact.value, "email")
-      name  = lookup(contact.value, "name")
-      phone = lookup(contact.value, "phone")
-    }
+  contact {
+    email = lookup(each.value, "email")
+    name  = lookup(each.value, "name")
+    phone = lookup(each.value, "phone")
   }
 }
 
 resource "azurerm_key_vault_certificate_issuer" "this" {
-  count         = length(var.key_vault) == 0 ? 0 : length(var.certificate_issuer)
-  key_vault_id  = try(element(azurerm_key_vault.this.*.id, lookup(var.certificate_issuer[count.index], "key_vault_id")))
-  name          = lookup(var.certificate_issuer[count.index], "name")
-  provider_name = lookup(var.certificate_issuer[count.index], "provider_name")
-  org_id        = lookup(var.certificate_issuer[count.index], "org_id")
-  account_id    = lookup(var.certificate_issuer[count.index], "account_id")
-  password      = lookup(var.certificate_issuer[count.index], "password")
+  for_each      = { for a in var.key_vault : a.name => a if contains(keys(a), "issuer") && a.issuer != null }
+  key_vault_id  = azurerm_key_vault.this[each.key].id
+  name          = lookup(each.value, "name")
+  provider_name = lookup(each.value, "provider_name")
+  org_id        = lookup(each.value, "org_id")
+  account_id    = lookup(each.value, "account_id")
+  password      = lookup(each.value, "password")
 
-  dynamic "admin" {
-    for_each = lookup(var.certificate_issuer[count.index], "admin") == null ? [] : ["admin"]
-    content {
-      email_address = lookup(admin.value, "email_address")
-      first_name    = lookup(admin.value, "first_name")
-      last_name     = lookup(admin.value, "last_name")
-      phone         = lookup(admin.value, "phone")
-    }
+  admin {
+    email_address = lookup(each.value, "email_address")
+    first_name    = lookup(each.value, "first_name")
+    last_name     = lookup(each.value, "last_name")
+    phone         = lookup(each.value, "phone")
   }
 }
 
 resource "azurerm_key_vault_key" "this" {
-  count           = length(var.key_vault) == 0 ? 0 : length(var.key_vault_key)
-  key_opts        = lookup(var.key_vault_key[count.index], "key_opts")
-  key_type        = lookup(var.key_vault_key[count.index], "key_type")
-  key_vault_id    = try(element(azurerm_key_vault.this.*.id, lookup(var.key_vault_key[count.index], "key_vault_id")))
-  name            = lookup(var.key_vault_key[count.index], "name")
-  key_size        = lookup(var.key_vault_key[count.index], "key_size")
-  curve           = lookup(var.key_vault_key[count.index], "curve")
-  not_before_date = lookup(var.key_vault_key[count.index], "not_before_date")
-  expiration_date = lookup(var.key_vault_key[count.index], "expiration_date")
-  tags            = merge(var.tags, lookup(var.key_vault_key[count.index], "tags"))
+  for_each        = { for b in var.key_vault_key : b.name => b }
+  key_opts        = each.value.key_opts
+  key_type        = each.value.key_type
+  key_vault_id    = azurerm_key_vault.this[0].id
+  name            = each.value.name
+  key_size        = each.value.key_size
+  curve           = each.value.curve
+  not_before_date = each.value.not_before_date
+  expiration_date = each.value.expiration_date
+  tags            = merge(var.tags, each.value.tags)
 
   dynamic "rotation_policy" {
-    for_each = lookup(var.key_vault_key[count.index], "rotation_policy") == null ? [] : ["rotation_policy"]
+    for_each = { for b in var.key_vault_key : b.name => b if contains(keys(b), "expire_after") || contains(keys(b), "notify_before_expiry") }
     content {
-      expire_after         = lookup(rotation_policy.value, "expire_after")
-      notify_before_expiry = lookup(rotation_policy.value, "notify_before_expiry")
+      expire_after         = each.value.expire_after
+      notify_before_expiry = each.value.notify_before_expiry
 
       dynamic "automatic" {
-        for_each = lookup(rotation_policy.value, "automatic") == null ? [] : ["automatic"]
+        for_each = { for b in var.key_vault_key : b.name => b if contains(keys(b), "time_after_creation") || contains(keys(b), "time_before_expiry") }
         content {
-          time_after_creation = lookup(automatic.value, "time_after_creation")
-          time_before_expiry  = lookup(automatic.value, "time_before_expiry")
+          time_after_creation = each.value.time_after_creation
+          time_before_expiry  = each.value.time_before_expiry
         }
       }
     }
@@ -207,97 +173,91 @@ resource "azurerm_key_vault_key" "this" {
 }
 
 resource "azurerm_key_vault_managed_hardware_security_module" "this" {
-  count                                     = length(var.managed_hardware_security_module)
+  for_each                                  = { for c in var.managed_hardware_security_module : c.name => c }
   admin_object_ids                          = [data.azurerm_client_config.this.object_id]
   location                                  = data.azurerm_resource_group.this.location
-  name                                      = lookup(var.managed_hardware_security_module[count.index], "name")
+  name                                      = each.value.name
   resource_group_name                       = data.azurerm_resource_group.this.name
-  sku_name                                  = lookup(var.managed_hardware_security_module[count.index], "sku_name", "Standard_B1")
+  sku_name                                  = each.value.sku_name
   tenant_id                                 = data.azurerm_client_config.this.tenant_id
-  purge_protection_enabled                  = lookup(var.managed_hardware_security_module[count.index], "purge_protection_enabled")
-  soft_delete_retention_days                = lookup(var.managed_hardware_security_module[count.index], "soft_delete_retention_days")
-  public_network_access_enabled             = lookup(var.managed_hardware_security_module[count.index], "public_network_access_enabled")
-  security_domain_key_vault_certificate_ids = lookup(var.managed_hardware_security_module[count.index], "security_domain_key_vault_certificate_ids")
-  security_domain_quorum                    = lookup(var.managed_hardware_security_module[count.index], "security_domain_quorum")
-  tags                                      = merge(var.tags, lookup(var.managed_hardware_security_module[count.index], "tags"))
+  purge_protection_enabled                  = each.value.purge_protection_enabled
+  soft_delete_retention_days                = each.value.soft_delete_retention_days
+  public_network_access_enabled             = each.value.public_network_access_enabled
+  security_domain_key_vault_certificate_ids = each.value.security_domain_key_vault_certificate_ids
+  security_domain_quorum                    = each.value.security_domain_quorum
+  tags                                      = merge(var.tags, each.value.tags)
 
-  dynamic "network_acls" {
-    for_each = (lookup(var.managed_hardware_security_module[count.index], "network_acls_bypass") && lookup(var.managed_hardware_security_module[count.index], "network_acls_default_action")) != null ? ["network_acls"] : []
-    content {
-      bypass         = lookup(var.managed_hardware_security_module[count.index], "network_acls_bypass")
-      default_action = lookup(var.managed_hardware_security_module[count.index], "network_acls_default_action")
-    }
+  network_acls {
+    bypass         = each.value.network_acls_bypass
+    default_action = each.value.network_acls_default_action
   }
 }
 
 resource "azurerm_key_vault_managed_hardware_security_module_key" "this" {
-  count           = length(var.managed_hardware_security_module_key)
-  name            = lookup(var.managed_hardware_security_module_key[count.index], "name")
-  key_opts        = lookup(var.managed_hardware_security_module_key[count.index], "key_opts")
-  key_type        = lookup(var.managed_hardware_security_module_key[count.index], "key_type")
-  managed_hsm_id  = try(element(azurerm_key_vault_managed_hardware_security_module.this.*.id, lookup(var.managed_hardware_security_module_key[count.index], "managed_hsm_id")))
-  curve           = lookup(var.managed_hardware_security_module_key[count.index], "curve")
-  expiration_date = lookup(var.managed_hardware_security_module_key[count.index], "expiration_date")
-  key_size        = lookup(var.managed_hardware_security_module_key[count.index], "key_size")
-  not_before_date = lookup(var.managed_hardware_security_module_key[count.index], "not_before_date")
-  tags            = merge(var.tags, lookup(var.managed_hardware_security_module_key[count.index], "tags"))
+  for_each        = { for c in var.managed_hardware_security_module : c.name => c if contains(keys(c), "key") && c.key != null }
+  name            = lookup(each.value, "name")
+  key_opts        = lookup(each.value, "key_opts")
+  key_type        = lookup(each.value, "key_type")
+  managed_hsm_id  = azurerm_key_vault_managed_hardware_security_module.this[each.key].id
+  curve           = lookup(each.value, "curve")
+  expiration_date = lookup(each.value, "expiration_date")
+  key_size        = lookup(each.value, "key_size")
+  not_before_date = lookup(each.value, "not_before_date")
+  tags            = merge(var.tags, lookup(each.value, "tags"))
 }
 
 resource "azurerm_key_vault_managed_hardware_security_module_role_definition" "this" {
-  count          = length(var.managed_hardware_security_module_role_definition)
-  name           = lookup(var.managed_hardware_security_module_role_definition[count.index], "name")
-  vault_base_url = try(element(azurerm_key_vault_managed_hardware_security_module.this.hsm_uri, lookup(var.managed_hardware_security_module_role_definition[count.index], "vault_base_id")))
-  description    = lookup(var.managed_hardware_security_module_role_definition[count.index], "description")
-  role_name      = lookup(var.managed_hardware_security_module_role_definition[count.index], "role_name")
+  for_each       = { for c in var.managed_hardware_security_module : c.name => c if contains(keys(c), "role_definition") && c.role_definition != null }
+  name           = lookup(each.value, "name")
+  managed_hsm_id = azurerm_key_vault_managed_hardware_security_module.this[each.key].id
+  description    = lookup(each.value, "description")
+  role_name      = lookup(each.value, "role_name")
 
-  dynamic "permission" {
-    for_each = lookup(var.managed_hardware_security_module_role_definition[count.index], "permission") == null ? [] : ["permission"]
-    content {
-      actions          = lookup(permission.value, "actions")
-      not_actions      = lookup(permission.value, "not_actions")
-      data_actions     = lookup(permission.value, "data_actions")
-      not_data_actions = lookup(permission.value, "not_data_actions")
-    }
+  permission {
+    actions          = lookup(each.value, "actions")
+    not_actions      = lookup(each.value, "not_actions")
+    data_actions     = lookup(each.value, "data_actions")
+    not_data_actions = lookup(each.value, "not_data_actions")
   }
 }
 
 resource "azurerm_key_vault_managed_hardware_security_module_role_assignment" "this" {
-  count              = (length(var.managed_hardware_security_module_role_definition) && length(var.managed_hardware_security_module)) == 0 ? 0 : length(var.managed_hardware_security_module_role_assignment)
-  managed_hsm_id     = try(element(azurerm_key_vault_managed_hardware_security_module.this.*.id, lookup(var.managed_hardware_security_module_role_assignment[count.index], "managed_hsm_id")))
-  name               = lookup(var.managed_hardware_security_module_role_assignment[count.index], "name")
+  for_each           = { for c in var.managed_hardware_security_module : c.name => c }
+  managed_hsm_id     = azurerm_key_vault_managed_hardware_security_module.this[0].id
+  name               = join("-", [each.value.name, "role"])
   principal_id       = data.azurerm_client_config.this.object_id
-  role_definition_id = try(element(data.azurerm_key_vault_managed_hardware_security_module_role_definition.this.*.resource_id, lookup(var.managed_hardware_security_module_role_assignment[count.index], "role_definition_id")))
-  scope              = try(element(data.azurerm_key_vault_managed_hardware_security_module_role_definition.this.*.scope, lookup(var.managed_hardware_security_module_role_assignment[count.index], "role_definition_id")))
+  role_definition_id = data.azurerm_key_vault_managed_hardware_security_module_role_definition.this[0].managed_hsm_id
+  scope              = data.azurerm_key_vault_managed_hardware_security_module_role_definition.this[0].assignable_scopes
 }
 
 resource "azurerm_key_vault_managed_storage_account" "this" {
-  count                        = (length(var.key_vault) && length(var.storage_account)) == 0 ? 0 : length(var.managed_storage_account)
-  key_vault_id                 = try(element(azurerm_key_vault.this.*.id, lookup(var.managed_storage_account[count.index], "key_vault_id")))
-  name                         = lookup(var.managed_storage_account[count.index], "name")
-  storage_account_id           = try(element(module.storage.*.storage_account_id, lookup(var.managed_storage_account[count.index], "storage_account_id")))
-  storage_account_key          = lookup(var.managed_storage_account[count.index], "storage_account_key")
-  regenerate_key_automatically = lookup(var.managed_storage_account[count.index], "regenerate_key_automatically")
-  regeneration_period          = lookup(var.managed_storage_account[count.index], "regeneration_period")
-  tags                         = merge(var.tags, lookup(var.managed_storage_account[count.index], "tags"))
+  for_each                     = { for a in var.key_vault : a.name => a if contains(keys(a), "managed_storage_account") && a.managed_storage_account != null }
+  key_vault_id                 = azurerm_key_vault.this[each.key].id
+  name                         = lookup(each.value, "name")
+  storage_account_id           = lookup(each.value, "storage_account_id")
+  storage_account_key          = lookup(each.value, "storage_account_key")
+  regenerate_key_automatically = lookup(each.value, "regenerate_key_automatically")
+  regeneration_period          = lookup(each.value, "regeneration_period")
+  tags                         = merge(var.tags, lookup(each.value, "tags"))
 }
 
 resource "azurerm_key_vault_managed_storage_account_sas_token_definition" "this" {
-  count                      = length(var.managed_storage_account) == 0 ? 0 : length(var.managed_storage_account_sas_token_definition)
-  managed_storage_account_id = try(element(azurerm_key_vault_managed_storage_account.this.*.id, lookup(var.managed_storage_account_sas_token_definition[count.index], "managed_storage_account_id")))
-  name                       = lookup(var.managed_storage_account_sas_token_definition[count.index], "name")
-  sas_template_uri           = try(element(module.storage.*.storage_account_id, lookup(var.managed_storage_account_sas_token_definition[count.index], "sas_template_id")))
-  sas_type                   = lookup(var.managed_storage_account_sas_token_definition[count.index], "sas_type")
-  validity_period            = lookup(var.managed_storage_account_sas_token_definition[count.index], "validity_period")
-  tags                       = merge(var.tags, lookup(var.managed_storage_account_sas_token_definition[count.index], "tags"))
+  for_each                   = { for a in var.managed_storage_account_sas_token_definition : a.name => a }
+  managed_storage_account_id = azurerm_key_vault_managed_storage_account.this[0].id
+  name                       = each.value.name
+  sas_template_uri           = each.value.sas_template_id
+  sas_type                   = each.value.sas_type
+  validity_period            = each.value.validity_period
+  tags                       = merge(var.tags, each.value.tags)
 }
 
 resource "azurerm_key_vault_secret" "this" {
-  count           = length(var.secret)
-  key_vault_id    = try(element(azurerm_key_vault.this.*.id, lookup(var.secret[count.index], "key_vault_id")))
-  name            = lookup(var.secret[count.index], "name")
-  value           = lookup(var.secret[count.index], "value")
-  content_type    = lookup(var.secret[count.index], "content_type")
-  not_before_date = lookup(var.secret[count.index], "not_before_date")
-  expiration_date = lookup(var.secret[count.index], "expiration_date")
-  tags            = merge(var.tags, lookup(var.secret[count.index], "tags"))
+  for_each        = { for a in var.secret : a.name => a }
+  key_vault_id    = azurerm_key_vault.this[0].id
+  name            = each.value.name
+  value           = each.value.value
+  content_type    = each.value.content_type
+  not_before_date = each.value.not_before_date
+  expiration_date = each.value.expiration_date
+  tags            = merge(var.tags, each.value.tags)
 }
